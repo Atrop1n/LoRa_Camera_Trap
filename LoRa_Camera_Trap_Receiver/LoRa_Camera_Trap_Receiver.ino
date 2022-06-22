@@ -27,7 +27,7 @@
 #define HSPI_SCLK 14
 #define HSPI_SS 15
 
-#define FILE_PHOTO "/photo.jpg"
+#define FILE_PHOTO "/photo.jpg" //path to the image in SPIFFS
 #define EEPROM_SIZE 1
 
 int EEPROMPosition = 0;
@@ -281,7 +281,7 @@ const char index_html[] PROGMEM = R"rawliteral(
    </script>
 </body>
 </html>)rawliteral";
-//this will help with periodic upadating of values
+//this will process periodic value updates on the webpage
 String processor(const String& var) {
   if (var == "RSSI") {
     return String(rssi);
@@ -330,7 +330,7 @@ void newPhoto() {
     Serial.println("Failed to open file in writing mode");
   }
 }
-//when a photo is finished
+//when a photo is fully transmitted
 void endPhoto() {
   file.close();
   if (!photo){
@@ -365,9 +365,9 @@ void sendConfigPacket(long int bandwidth, int spreadFactor) {
     delay(1500);
     Serial.println(".");
   }
-  LoRa.setSignalBandwidth(bandwidth);
+  LoRa.setSignalBandwidth(bandwidth);//sets bandwidth
   Serial.println("Bandwidth set to " + String(bandwidth));
-  LoRa.setSpreadingFactor(spreadFactor);
+  LoRa.setSpreadingFactor(spreadFactor);//sets spread factor
   Serial.println("Spread factor set to " + String(spreadFactor));
 }
 //updates timestamp
@@ -489,7 +489,7 @@ void setup() {
   //clear SPIFFS
   SPIFFS.remove("/photo.jpg");
   //set current time
-  configTime(7200, 0, "ntp.telekom.sk"); //choose correct ntp server for your area
+  configTime(7200, 0, "ntp.telekom.sk"); //choose correct ntp server for your region, first argument is time shift in seconds
   Serial.println("Waiting for a new image");
 }
 
@@ -527,7 +527,7 @@ void loop() {
       lastNum = num;
       stringNum = addZeroes(String(packetNumber + 1, DEC));
 
-      if (stringChunk != lastPacket) { //because each packet was sent multiple times, we process only packets that are not the same as previous one
+      if (stringChunk != lastPacket) { //because each packet was sent multiple times, we process only unique packets
         if (!file) {
           Serial.println("Failed to open file in writing mode");
         } else {
