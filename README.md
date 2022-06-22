@@ -24,7 +24,7 @@ MOSI              13                                                MOSI        
 MISO              12                                                MISO             12
 SCK               14                                                SCK              14
 VCC               3V3                                               VCC              3V3
-RST               -                                                 RST              4
+RST               not connected                                     RST              4
 DIO0              2                                                 DIO0             2
 
 PIR:                                                                I2C LCD:
@@ -167,3 +167,14 @@ void loop()
   waitForConfigPacket();
 }
 ```  
+## Common issues
+Here are some issues I came across while working on the project:
+```
+PROBLEM                                                               SOLUTION
+1. LoRa won't initialize                                              Make sure the module is connected exactly according to the pinout.
+2. Reciever is not getting any packets                                Make sure both modules are configured with the exact same bandwidth, spread factor, and coding rate. Keep the RSSI above -120 dBm and SNR above 0. Also don't forget to trigger the motion sensor!
+3. Pictures are too brigth                                            Move the camera out of direct sun, or take extra dummy pictures before transmitting.
+4. There is no photo on the webpage, even if new packets are coming   Refresh the page. If the problem persists, it means the initial packet was not received. Restart both modules and try again. You can also try decreasing bandwidth and increasing spread factor.
+5. Pictures contain horizontal stripes and weird discoloring          Some packets were lost. Increase bandwidth, decrease sprad factor, or decrease range. 
+6. Timestamp is shifted by a few hours                                Change the ntp server and adjust the time shift in configTime().
+```
