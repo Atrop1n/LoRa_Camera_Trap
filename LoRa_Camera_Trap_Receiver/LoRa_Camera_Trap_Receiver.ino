@@ -223,8 +223,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                <td style="text-align: left;"><label for="spreadFactor">Spread factor</label></td>
                <td>
                <select onchange="getSpreadFactor(), retain()" name="spreadFactor" id="spreadFactor" class="dropdown-menu">
-                  <option value="6"  selected>6</option>
-                  <option value="7">7</option>
+                  <option value="7"  selected>7</option>
                   <option value="8">8</option>
                   <option value="9">9</option>
                   <option value="10">10</option>
