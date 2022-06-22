@@ -131,6 +131,11 @@ void takePic(bool transmit) {
     for (int i = 0; i < totalPackets; i++) { //sends all the chunks
       sendChunk(i, fb); 
       delay(packetDelay);
+       if (i==0) //send initial packet twice
+      {
+        sendChunk(i,fb);
+        delay(packetDelay);
+      }
     }
     //send remainder
     int remainder = size % chunkSize;
