@@ -71,9 +71,9 @@ As a next step, change the ntp server to fit your region in *setup()*. First par
 ```  
 configTime(7200, 0, "your.ntp.server");
 ```  
-You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! These parameters can also be configured on the webpage, where the sender will be configured automatically. More on that later. To upload code, push the BOOT button on your board as soon as you see dots and underscores, and release it after the board starts booting.
+You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! These parameters can also be configured on the webpage, where the sender will be configured automatically. More on that later. 
 
-After board initialization, connect to IP address printed by the serial monitor. You should see this page:
+To upload code, push the BOOT button on your board as soon as you see dots and underscores, and release it after the board starts booting. After board initialization, connect to IP address printed by the serial monitor. You should see this page:
 ![image](https://user-images.githubusercontent.com/92330911/174888630-2c678a90-a134-433b-b4fb-0a8b3a27c649.png)
 
 Values are empty, because no photo has been captured yet. In order to do so, let's set up the sender module.
@@ -102,71 +102,10 @@ In order to upload code to ESP32-CAM, connect the FTDI adapter accoring to the p
 After you are done, disconnect GPIO0 from GND and connect PIR module according to the pinout. Press reset button once more. 
 
 ### Webpage
-After both devices are set up, wave you hand in front of the PIR sensor, to trigger motion detection. You should see changes on the webpage and LCD display. Image was taken and is now being transmitted. All values except image will now be automatically updated every 5 seconds. In order to update the image, refresh the page. Once the image is fully transmitted, it will stay on the screen until a new one is taken. 
+After both devices are set up, wave your hand in front of the PIR sensor, to trigger motion detection. You should see changes on the webpage and LCD display. Image was taken and is now being transmitted. All values except image will now be automatically updated every 5 seconds. In order to update the image, refresh the page. Once the image is fully transmitted, it will stay on the screen until a new one is taken. 
+
 If you configure LoRa bandwidth or spreading factor on the webpage, changes will take effect **only** after a picture is fully transmitted. The reason is that all the parameter changes must be applied to both sender and receiver. This is achieved by sending a config packet from receiver to sender. The sender listens for packets only for a short time right after it has finished image transmission.
 
-### sending config packet (receiver)
-```  
-void sendConfigPacket(long int bandwidth, int spreadFactor) {
-  Serial.println("Sending config packet to the sender");
-  for (int i = 0; i < 3; i++) {
-    LoRa.beginPacket();
-    LoRa.print(String(bandwidth) + ":" + String(spreadFactor));
-    LoRa.endPacket();
-    delay(1500);
-    Serial.println(".");
-  }
-  LoRa.setSignalBandwidth(bandwidth);
-  Serial.println("Bandwidth set to " + String(bandwidth));
-  LoRa.setSpreadingFactor(spreadFactor);
-  Serial.println("Spread factor set to " + String(spreadFactor));
-}
-void loop()
-{
-  if (packetCount + 1 == totalPackets.toInt()) {//if received a final packet
-        endPhoto();
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Finished");
-        sendConfigPacket(bandwidth, spreadFactor);
-      }
-}
-```  
-### receiving config packet (sender)
-```  
-void waitForConfigPacket() {
-  Serial.println("Waiting for config packet");
-  previousMillis = millis();
-  while (true) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= 10000) {
-      previousMillis = currentMillis;
-      Serial.println("Nothing arrived, moving on..");
-      return;
-    }
-    int packetSize = LoRa.parsePacket(); // try to parse packet
-    if (packetSize) {  // received a packet
-      String loraData;
-      while (LoRa.available()) {
-        loraData = LoRa.readString();
-      }
-      bandwidth = loraData.substring(0, loraData.indexOf(':')).toInt(); //extract bandwidth from the packet
-      spreadFactor = loraData.substring(loraData.lastIndexOf(':')+1,loraData.length()).toInt(); //extract spread factor from the packet
-      LoRa.setSignalBandwidth(bandwidth);
-      Serial.println("Bandwidth set to "+String(bandwidth));
-      LoRa.setSpreadingFactor(spreadFactor);
-      Serial.println("Spread factor set to "+String(spreadFactor));
-      return;
-    }
-  }
-}
-void loop()
-{
-  takePic(true);
-  Serial.println("Finished taking picture");
-  waitForConfigPacket();
-}
-```  
 ## Common issues
 Here are some issues I came across while working on the project:
 ```
