@@ -35,9 +35,9 @@
 
 static int chunkSize = 250; //size of jpeg data in a single packet, max 250
 static int redundancy = 4; //amount of times each packet is sent, higher number means more reliability, min 3
-int movementStatus; //movement detection status
+int movementStatus; 
 int packetDelay = 100; //delay after sending a packet
-long int bandwidth = 500000; //LoRa bandwidth
+long int bandwidth = 500000; 
 int spreadFactor = 7; //7-12
 unsigned long previousMillis = 0;
 //formats the packet number
@@ -52,9 +52,9 @@ String addZeroes(String num) {
   return num;
 }
 
-void sendChunk(int packetNumber, camera_fb_t* fb) { //send a chunk of data
+void sendChunk(int packetNumber, camera_fb_t* fb) {
   uint8_t chunk[chunkSize];
-  memcpy(chunk, (fb->buf) + (chunkSize * packetNumber), chunkSize);  //copy bytes from image buffer to an array
+  memcpy(chunk, (fb->buf) + (chunkSize * packetNumber), chunkSize); 
   Serial.println("Sending packet: " + String(packetNumber));
   for (int r = 0; r < redundancy; r++) {
     LoRa.beginPacket();
@@ -98,14 +98,14 @@ void takePic(bool transmit) {
   if (transmit == false) { //takes a picture without transmission
     Serial.println("Taking pic ");
     camera_fb_t* fb = NULL;
-    fb = esp_camera_fb_get();  // sets up a pointer to jpeg data
+    fb = esp_camera_fb_get(); 
     if (!fb) {
       Serial.println("Camera capture failed");
       Serial.println("Restarting");
       ESP.restart();
       return;
     }
-    int size = fb->len;  //gets size of jpeg
+    int size = fb->len; 
     Serial.println("Size of picture is: " + String(size) + " bytes");
     esp_camera_fb_return(fb);
     delay(1000);
@@ -113,7 +113,7 @@ void takePic(bool transmit) {
   if (transmit == true) { //takes and transmits a picture
     Serial.println("Taking and sending pic ");
     camera_fb_t* fb = NULL;
-    fb = esp_camera_fb_get();  // sets up a pointer to jpeg data
+    fb = esp_camera_fb_get();  
     if (!fb) {
       Serial.println("Camera capture failed");
       Serial.println("Restarting");
@@ -131,7 +131,7 @@ void takePic(bool transmit) {
     for (int i = 0; i < totalPackets; i++) { //sends all the chunks
       sendChunk(i, fb); 
       delay(packetDelay);
-       if (i==0) //send initial packet twice
+       if (i==0) //send initial packet twice, because it sometimes gets lost
       {
         sendChunk(i,fb);
         delay(packetDelay);
@@ -145,7 +145,7 @@ void takePic(bool transmit) {
     for (int r = 0; r < redundancy; r++) {
       LoRa.beginPacket();
       for (int j = 0; j < remainder; j++) {
-        LoRa.write(chunk[j]);  //sending the payload
+        LoRa.write(chunk[j]);  
       }
       for (int j = remainder; j < chunkSize; j++) {
         LoRa.write(255);
@@ -226,7 +226,7 @@ void setup() {
 }
 
 void loop() {
-  movementStatus = digitalRead(PIR_PIN); //read from PIR sensor
+  movementStatus = digitalRead(PIR_PIN); 
   if(movementStatus == 1) //if movement detected
   {
   delay(1000);
