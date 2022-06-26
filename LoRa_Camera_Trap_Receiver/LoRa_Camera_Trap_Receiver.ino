@@ -31,7 +31,7 @@
 #define EEPROM_SIZE 1
 
 int EEPROMPosition = 0;
-//credentials for your access point
+
 const char* ssid = "SSID";
 const char* password = "password";
 
@@ -59,7 +59,6 @@ String rssi;
 String snr;
 String path;
 String timestamp;
-//html page
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
@@ -365,9 +364,9 @@ void sendConfigPacket(long int bandwidth, int spreadFactor) {
     delay(1500);
     Serial.println(".");
   }
-  LoRa.setSignalBandwidth(bandwidth);//sets bandwidth
+  LoRa.setSignalBandwidth(bandwidth);
   Serial.println("Bandwidth set to " + String(bandwidth));
-  LoRa.setSpreadingFactor(spreadFactor);//sets spread factor
+  LoRa.setSpreadingFactor(spreadFactor);
   Serial.println("Spread factor set to " + String(spreadFactor));
 }
 //updates timestamp
@@ -380,7 +379,7 @@ void getTime() {
   timestamp = buff;
   Serial.println(timestamp);
 }
-//to create soft AP
+//if creating soft AP
 void softAP() {
   WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
@@ -399,25 +398,22 @@ void wifiConnect() {
 }
 
 void setup() {
-  //initialize Serial Monitor
   Serial.begin(115200);
 
   //softAP();
   wifiConnect();
   server.begin();
   
-  //initialize SPIFFS
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
     ESP.restart();
   } 
-  //initialize both SPI interfaces, hspi is used by LoRa, vspi is used by SD card reader
+  //HSPI is used by LoRa, VSPI is used by SD card reader
   SPIClass* hspi = NULL;
   hspi = new SPIClass(HSPI);
   hspi->begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS);
   LoRa.setSPI(*hspi);
   SPI.begin(18, 19, 23, 5);
-  //set LoRa pins
   LoRa.setPins(SS, RST, DIO0);
   //replace the LoRa.begin(---E-) argument with your location's frequency
   //433E6 for Asia
@@ -431,22 +427,20 @@ void setup() {
   // The sync word assures you don't get LoRa messages from other LoRa transceivers
   // ranges from 0-0xFF
   LoRa.setSyncWord(0x6C);
-  //enable error check
+  //enable error check, highly recommended
   LoRa.enableCrc();
   LoRa.setSignalBandwidth(bandwidth);
   LoRa.setSpreadingFactor(spreadFactor);
   Serial.println("LoRa Initializing OK!");
   delay(500);
-  //initialize SD card
   if (!SD.begin()) {
     Serial.println("SD Card Mount Failed");
   } 
-  //initialize EEPROM
   EEPROM.begin(EEPROM_SIZE);
   EEPROMPosition = EEPROM.read(0) + 1;
   EEPROM.write(0, EEPROMPosition);
   EEPROM.commit();
-  // initialize http methods
+  // http methods 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/html", index_html, processor);
   });
@@ -480,7 +474,6 @@ void setup() {
   server.on("/timestamp", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/plain", timestamp.c_str());
   });
-  //initialize LCD
   lcd.init();
   lcd.backlight();
   lcd.print("Init OK");
@@ -488,7 +481,6 @@ void setup() {
   lcd.print(WiFi.localIP());
   //clear SPIFFS
   SPIFFS.remove("/photo.jpg");
-  //set current time
   configTime(7200, 0, "ntp.telekom.sk"); //choose correct ntp server for your region, first argument is time shift in seconds
   Serial.println("Waiting for a new image");
 }
