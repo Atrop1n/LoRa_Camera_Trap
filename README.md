@@ -35,8 +35,8 @@ GND               GND                                               SDA         
 FTDI:                                                                    
 GND               GND                                               SD Card reader:
 5V                5V                                                GND              GND
-RX                U0T(3), only connect while flashing               MISO             19
-TX                U0R(1)                                            SCK              18
+RX                U0T(1)                                            MISO             19
+TX                U0R(3), only connect while flashing               SCK              18
                                                                     MOSI             23
                                                                     CS               5
                                                                     3V3              3V3
