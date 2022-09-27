@@ -57,6 +57,9 @@ EEPROM.h
 time.h 
 esp_camera.h
 ```
+In order to use ESP32 boards on your Arduino IDE, go to file/preferences/settings and add this URL to Additional boards URL: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+Next, in tools/board/boards manager install the ESP32 package.
+
 ### Receiver
 Board name is DOIT ESP32 DEVKIT V1.
 
