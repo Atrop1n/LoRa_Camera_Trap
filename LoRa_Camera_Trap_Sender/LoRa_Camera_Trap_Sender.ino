@@ -10,7 +10,7 @@
 #define PIR_PIN 3
 //define LoRa pins
 #define SS 15
-#define RST 16
+#define RST -1
 #define DIO0 2
 #define SCK 14
 #define MISO 12
