@@ -20,8 +20,8 @@
 
 int EEPROMPosition = 0;
 
-const char* ssid = "Telekom-792190";
-const char* password = "8aubtf5d59r7tghx";
+const char* ssid = "wifi_ssid";
+const char* password = "wifi_password";
 AsyncWebServer server(80);
 SPIClass hspi = SPIClass(HSPI);
 
