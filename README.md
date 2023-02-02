@@ -1,3 +1,6 @@
+***I've recently added code for 2.4GHz module. The wiring is different than in the case of 868 MHz module, I'll upload the correct pinout soon. 
+There might be some bugs in this new version, I'll fix them soon as well.***	
+
 # LoRa_Camera_Trap
 Create a remote camera trap using LoRa.
 ## Description
