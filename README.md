@@ -43,7 +43,11 @@ TX                U0R(3), only connect while flashing               SCK         
                                                                     MOSI             23
                                                                     CS               5
                                                                     3V3              3V3
-```                                                               
+```
+![IMG_4345](https://github.com/Atrop1n/LoRa_Camera_Trap/assets/92330911/6eb8cae3-2895-4ef4-ac15-7ae9aff33373)
+                                                               
+![IMG_4349](https://github.com/Atrop1n/LoRa_Camera_Trap/assets/92330911/3eaf3441-0951-4dd6-a62b-ca937e01470b)
+
 You must attach an antenna to you LoRa modules, otherwise you are risking damage to the modules. A piece of insulated wire will do, but adjust the length to the frequency of your module. Antenna should be quarter or half a wavelength long. I have used quarter a wavelength.
 ## Usage
 First you will need to install the following libraries:
