@@ -33,87 +33,241 @@
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 
-static int chunkSize = 250; //size of jpeg data in a single packet, max 250
-static int redundancy = 4; //amount of times each packet is sent, higher number means more reliability, min 3
-int movementStatus; 
-int packetDelay = 100; //delay after sending a packet
-long int bandwidth = 500000; 
-int spreadFactor = 7; //7-12
-unsigned long previousMillis = 0;
-//formats the packet number
-String addZeroes(String num) {
-  if (num.length() == 1) {
-    num = "000" + num;
-  } else if (num.length() == 2) {
-    num = "00" + num;
-  } else if (num.length() == 3) {
-    num = "0" + num;
+
+static int chunk_size = 250;  //size of jpeg data in a single packet, max 250
+int movement_status;
+long int bandwidth = 500000;
+int spread_factor = 7;  //7-12
+int total_packets = 0;
+unsigned long start_millis = 0;
+unsigned long current_millis = 0;
+int ack_wait_timeout = 5000;
+int SF_find_timeout = 300;
+byte total_packets_array[2];
+byte packet_number_array[2];
+
+void send_chunk(int packet_number, camera_fb_t* fb) {
+  uint8_t chunk[chunk_size];
+  memcpy(chunk, (fb->buf) + (chunk_size * (packet_number - 1)), chunk_size);
+  Serial.println("Sending packet: " + String(packet_number));
+  LoRa.beginPacket();
+  for (int j = 0; j < chunk_size; j++) {
+    LoRa.write(chunk[j]);  //sending the payload
+    //Serial.print(String(chunk[j],HEX));
   }
-  return num;
+  //Serial.println("");
+  LoRa.write(packet_number_array[0]);  //write packet number as two byte number
+  LoRa.write(packet_number_array[1]);
+  LoRa.write(total_packets_array[0]);  //write total packets count as two byte number
+  LoRa.write(total_packets_array[1]);
+  LoRa.endPacket();
 }
 
-void sendChunk(int packetNumber, camera_fb_t* fb) {
-  uint8_t chunk[chunkSize];
-  memcpy(chunk, (fb->buf) + (chunkSize * packetNumber), chunkSize); 
-  Serial.println("Sending packet: " + String(packetNumber));
-  for (int r = 0; r < redundancy; r++) {
-    LoRa.beginPacket();
-    for (int j = 0; j < chunkSize; j++) {
-      LoRa.write(chunk[j]);  //sending the payload
-    }
-    LoRa.write(packetNumber);
-    LoRa.endPacket();
-  }
-}
-
-void waitForConfigPacket() {
-  Serial.println("Waiting for config packet");
-  previousMillis = millis();
+int findSF() {
+  start_millis = millis();
+  Serial.println("Trying SF 7");
+  LoRa.setSpreadingFactor(7);
   while (true) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= 10000) {
-      previousMillis = currentMillis;
-      Serial.println("Nothing arrived, moving on..");
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 7");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  start_millis = millis();
+  Serial.println("Trying SF 8");
+  LoRa.setSpreadingFactor(8);
+  while (true) {
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 8");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  start_millis = millis();
+  Serial.println("Trying SF 9");
+  LoRa.setSpreadingFactor(9);
+  while (true) {
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 9");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  start_millis = millis();
+  Serial.println("Trying SF 10");
+  LoRa.setSpreadingFactor(10);
+  while (true) {
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 10");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  start_millis = millis();
+  Serial.println("Trying SF 11");
+  LoRa.setSpreadingFactor(11);
+  while (true) {
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 11");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  start_millis = millis();
+  Serial.println("Trying SF 12");
+  LoRa.setSpreadingFactor(12);
+  while (true) {
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      Serial.println("SF is 12");
+      return 1;
+    }
+    current_millis = millis();
+    if (current_millis - start_millis >= SF_find_timeout) {
+      break;
+    }
+  }
+  return 0;
+}
+
+void find_BW() {
+  Serial.println("I have got no acknowledgement from the receiver in "+String(ack_wait_timeout/10000)+" seconds.\nMaybe it switched to a different bandwidth and spreading factor. \nNow I will attemp to try these values.");
+  while (true) {
+    LoRa.setSignalBandwidth(7800);
+    Serial.println("Trying BW 7800");
+    if (findSF() == 1) {
+      Serial.println("BW is 7800");
       return;
     }
-    int packetSize = LoRa.parsePacket();   // try to parse packet
-    if (packetSize) {   // received a packet
-      String loraData;
-      while (LoRa.available()) {
-        loraData = LoRa.readString();
-      }
-      bandwidth = loraData.substring(0, loraData.indexOf(':')).toInt(); //extract bandwidth from a config packet
-      spreadFactor = loraData.substring(loraData.lastIndexOf(':')+1,loraData.length()).toInt(); //extract spread factor from a config packet
-      LoRa.setSignalBandwidth(bandwidth);
-      Serial.println("Bandwidth set to "+String(bandwidth));
-      LoRa.setSpreadingFactor(spreadFactor);
-      Serial.println("Spread factor set to "+String(spreadFactor));
+    LoRa.setSignalBandwidth(10400);
+    Serial.println("Trying BW 10400");
+    if (findSF() == 1) {
+      Serial.println("BW is 10400");
+      return;
+    }
+    LoRa.setSignalBandwidth(15600);
+    Serial.println("Trying BW 15600");
+    if (findSF() == 1) {
+      Serial.println("BW is 15600");
+      return;
+    }
+    LoRa.setSignalBandwidth(20800);
+    Serial.println("Trying BW 20800");
+    if (findSF() == 1) {
+      Serial.println("BW is 20800");
+      return;
+    }
+    LoRa.setSignalBandwidth(31250);
+    Serial.println("Trying BW 31250");
+    if (findSF() == 1) {
+      Serial.println("BW is 31250");
+      return;
+    }
+    LoRa.setSignalBandwidth(41700);
+    Serial.println("Trying BW 41700");
+    if (findSF() == 1) {
+      Serial.println("BW is 41700");
+      return;
+    }
+    LoRa.setSignalBandwidth(62500);
+    Serial.println("Trying BW 62500");
+    if (findSF() == 1) {
+      Serial.println("BW is 62500");
+      return;
+    }
+    LoRa.setSignalBandwidth(125000);
+    Serial.println("Trying BW 125000");
+    if (findSF() == 1) {
+      Serial.println("BW is 125000");
+      return;
+    }
+    LoRa.setSignalBandwidth(250000);
+    Serial.println("Trying BW 250000");
+    if (findSF() == 1) {
+      Serial.println("BW is 250000");
+      return;
+    }
+    LoRa.setSignalBandwidth(500000);
+    Serial.println("Trying BW 500000");
+    if (findSF() == 1) {
+      Serial.println("BW is 500000");
       return;
     }
   }
 }
 
 
-void takePic(bool transmit) {
-  if (transmit == false) { //takes a picture without transmission
+
+
+
+int wait_for_ack(int packet_number)  //return 1 for OK, return 0 for retransmission
+{
+  start_millis = millis();
+  while (true) {
+    current_millis = millis();
+    if (current_millis - start_millis >= ack_wait_timeout) {
+      find_BW();
+      start_millis = current_millis;
+    }
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
+      byte packet_confirmation_array[2];
+      while (LoRa.available()) {
+        LoRa.readBytes(packet_confirmation_array, 2);
+        int packet_confirmation = packet_confirmation_array[0] + 256 * packet_confirmation_array[1];
+        if (packet_confirmation != packet_number) {
+          Serial.println("Expected confirmation for packet " + String(packet_number) + ", got confirmation for packet " + String(packet_confirmation) + ". Sending packet " + String(packet_number) + " again...");
+          return 0;
+        } else {
+          Serial.println(String(packet_confirmation) + " OK!");
+          return 1;
+        }
+      }
+    }
+  }
+}
+
+void take_pic(bool transmit) {
+  if (transmit == false) {  //takes a picture without transmission
     Serial.println("Taking pic ");
     camera_fb_t* fb = NULL;
-    fb = esp_camera_fb_get(); 
+    fb = esp_camera_fb_get();
     if (!fb) {
       Serial.println("Camera capture failed");
       Serial.println("Restarting");
       ESP.restart();
       return;
     }
-    int size = fb->len; 
+    int size = fb->len;
     Serial.println("Size of picture is: " + String(size) + " bytes");
     esp_camera_fb_return(fb);
     delay(1000);
   }
-  if (transmit == true) { //takes and transmits a picture
+  if (transmit == true) {  //takes and transmits a picture
     Serial.println("Taking and sending pic ");
     camera_fb_t* fb = NULL;
-    fb = esp_camera_fb_get();  
+    fb = esp_camera_fb_get();
     if (!fb) {
       Serial.println("Camera capture failed");
       Serial.println("Restarting");
@@ -122,40 +276,21 @@ void takePic(bool transmit) {
     }
     int size = fb->len;  //gets size of jpeg
     Serial.println("Size of picture is: " + String(size) + " bytes");
-    int totalPackets = (size / chunkSize);
-    Serial.println("Total number of packets to transmit: " + addZeroes(String(totalPackets + 1)));
-    LoRa.beginPacket();
-    LoRa.print(addZeroes(String(totalPackets + 1))); //sends initial packet
-    LoRa.endPacket();
-    delay(500);
-    for (int i = 0; i < totalPackets; i++) { //sends all the chunks
-      sendChunk(i, fb); 
-      delay(packetDelay);
-       if (i==0) //send initial packet twice, because it sometimes gets lost
-      {
-        sendChunk(i,fb);
-        delay(packetDelay);
-      }
-    }
-    //send remainder
-    int remainder = size % chunkSize;
-    uint8_t chunk[remainder];
-    memcpy(chunk, (fb->buf) + (chunkSize * totalPackets), remainder);  
-    Serial.println("Sending packet: " + String(totalPackets));
-    for (int r = 0; r < redundancy; r++) {
-      LoRa.beginPacket();
-      for (int j = 0; j < remainder; j++) {
-        LoRa.write(chunk[j]);  
-      }
-      for (int j = remainder; j < chunkSize; j++) {
-        LoRa.write(255);
-      }
-      LoRa.write(totalPackets);
-      LoRa.endPacket();
-    }
+    total_packets = (size / chunk_size) + 1;
+    Serial.println("Total number of packets to transmit: " + String(total_packets));
+    total_packets_array[0] = total_packets % 256;
+    total_packets_array[1] = total_packets / 256;
+    for (int i = 1; i <= total_packets; i++) {  //sends all the chunks
+      packet_number_array[0] = i % 256;
+      packet_number_array[1] = i / 256;
+      send_chunk(i, fb);
 
+      while (wait_for_ack(i) == 0) {
+        //retransmit the packet until ack is OK
+        send_chunk(i, fb);
+      }
+    }
     Serial.println("Finished transimssion");
-
     esp_camera_fb_return(fb);
   }
 }
@@ -204,7 +339,7 @@ void setup() {
 
   SPI.begin(SCK, MISO, MOSI, SS);
   //LoRa init
-  LoRa.setPins(SS,RST,DIO0);
+  LoRa.setPins(SS, RST, DIO0);
   //replace the LoRa.begin(---E-) argument with your location's frequency
   //433E6 for Asia
   //866E6 for Europe
@@ -219,25 +354,23 @@ void setup() {
   LoRa.setSyncWord(0x6C);
   LoRa.enableCrc();
   LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spreadFactor);
+  LoRa.setSpreadingFactor(spread_factor);
   Serial.println("LoRa Initializing OK!");
   // init PIR data pin
   pinMode(PIR_PIN, INPUT);
+  start_millis = millis();
 }
 
 void loop() {
-  movementStatus = digitalRead(PIR_PIN); 
-  if(movementStatus == 1) //if movement detected
+  movement_status = digitalRead(PIR_PIN);
+  if (movement_status == 1)  //if movement detected
   {
-  delay(1000);
-  takePic(false); //take a few dummy pictures without transmission, to adjust exposure time and other parameters
-  delay(2000);
-  takePic(false);
-  delay(2000);
-  takePic(true); //take and transmit picture
-  Serial.println("Finished taking picture");
-  waitForConfigPacket(); 
-  delay(2500);
+    take_pic(false); //taking dummy pictures helps calibrate the camera for light conditions
+    delay(1000);
+    take_pic(false);
+    delay(1000);
+    take_pic(true);  //this picture will be transmitted
+    Serial.println("Finished taking picture");
   }
-  Serial.println(movementStatus);
+  Serial.println(movement_status);
 }
