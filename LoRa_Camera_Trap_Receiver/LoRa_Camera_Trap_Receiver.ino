@@ -27,38 +27,37 @@
 #define HSPI_SCLK 14
 #define HSPI_SS 15
 
-#define FILE_PHOTO "/photo.jpg" //path to the image in SPIFFS
+#define FILE_PHOTO "/photo.jpg"  //path to the image in SPIFFS
 #define EEPROM_SIZE 1
 
-int EEPROMPosition = 0;
+int EEPROM_position = 0;
 
-const char* ssid = "SSID";
-const char* password = "password";
+const char* ssid = "Your_access_point";
+const char* password = "Your_password";
 
 AsyncWebServer server(80);
 
-String totalPackets;
-const int chunkSize = 250;
-byte chunk[chunkSize];
-int packetNumber;
-byte num = 0;
-String lastPacket = "";
-String stringChunk = "";
-int lastNum = 0;
-int factor = 0;
-int lcdColumns = 16;
-int lcdRows = 2;
-LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
+int total_packets;
+const int chunk_size = 250;
+byte chunk[chunk_size];
+int packet_number;
+byte current_packet_array[2];
+String string_num;
+int lcd_columns = 16;
+int lcd_rows = 2;
+LiquidCrystal_I2C lcd(0x27, lcd_columns, lcd_rows);
 File file;
 File photo;
-int EEPROMCount = 0;
-long int bandwidth = 500000;
-int spreadFactor = 7;
-String stringNum;
+int EEPROM_count = 0;
+int bandwidth = 500000;
+int spread_factor = 7;
 String rssi;
 String snr;
 String path;
 String timestamp;
+int ack_retransmission_period = random(150, 200);
+unsigned long start_millis;
+unsigned long current_millis;
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
@@ -189,8 +188,8 @@ const char index_html[] PROGMEM = R"rawliteral(
       <strong></strong><span id="timestamp" style="font-weight: 600;">%TIMESTAMP%</span></strong>
    </p>
    <p class="p"></p>
-   <p class="p">Received packets: <span id="stringNum">%STRING_NUM%</span>/<span
-         id="totalPackets">%TOTAL_PACKETS%</span></p>
+   <p class="p">Received packets: <span id="string_num">%STRING_NUM%</span>/<span
+         id="total_packets">%TOTAL_PACKETS%</span></p>
          <div class="picture-holder">
    <img src="saved-photo" id="photo">
         </div>
@@ -214,14 +213,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                <option value="62500">62.5</option>
                <option value="125000">125</option>
                <option value="250000">250</option>
-               <option value="500000" selected>500</option>
+               <option value="500000">500</option>
             </select>
          </td>
          </tr>
             <tr class="parameter">
-               <td style="text-align: left;"><label for="spreadFactor">Spread factor</label></td>
+               <td style="text-align: left;"><label for="spread_factor">Spread factor</label></td>
                <td>
-               <select onchange="getSpreadFactor(), retain()" name="spreadFactor" id="spreadFactor" class="dropdown-menu">
+               <select onchange="getspread_factor(), retain()" name="spread_factor" id="spread_factor" class="dropdown-menu">
                   <option value="7"  selected>7</option>
                   <option value="8">8</option>
                   <option value="9">9</option>
@@ -237,8 +236,8 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
    <script>
       setInterval(updateValues, 5000, "rssi");
-      setInterval(updateValues, 5000, "totalPackets");
-      setInterval(updateValues, 5000, "stringNum");
+      setInterval(updateValues, 5000, "total_packets");
+      setInterval(updateValues, 5000, "string_num");
       setInterval(updateValues, 5000, "snr");
       setInterval(updateValues, 5000, "path");
       setInterval(updateValues, 5000, "timestamp");
@@ -256,24 +255,24 @@ const char index_html[] PROGMEM = R"rawliteral(
       function getBandwidth(value) {
          var xhttp = new XMLHttpRequest();
          var x = document.getElementById("bandwidth").value;
-         document.getElementById("demo").innerHTML = "Bandwidth set to " + x+ "<br>Changes will take effect after a picture is fully transmitted";
+         document.getElementById("demo").innerHTML = "Bandwidth set to " + x;
          xhttp.open("GET", "/update?bandwidth="+x, true);
          xhttp.send();
       }
-       function getSpreadFactor(value) {
+       function getspread_factor(value) {
          var xhttp = new XMLHttpRequest();
-         var x = document.getElementById("spreadFactor").value;
-         document.getElementById("demo").innerHTML = "Spread factor set to " + x+ "<br>Changes will take effect after a picture is fully transmitted";
-         xhttp.open("GET", "/update?spreadFactor="+ x, true);
+         var x = document.getElementById("spread_factor").value;
+         document.getElementById("demo").innerHTML = "Spread factor set to " + x;
+         xhttp.open("GET", "/update?spread_factor="+ x, true);
          xhttp.send();
       }
        function retain(value) {
-         sessionStorage.setItem("sf", document.getElementById("spreadFactor").value);
+         sessionStorage.setItem("sf", document.getElementById("spread_factor").value);
          sessionStorage.setItem("bw", document.getElementById("bandwidth").value);
       }
       window.onload = function() {
          {
-            document.getElementById('spreadFactor').value=sessionStorage.getItem("sf");
+            document.getElementById('spread_factor').value=sessionStorage.getItem("sf");
             document.getElementById('bandwidth').value=sessionStorage.getItem("bw");
          }
       };
@@ -287,9 +286,9 @@ String processor(const String& var) {
   } else if (var == "SNR") {
     return String(snr);
   } else if (var == "STRING_NUM") {
-    return String(stringNum);
+    return String(string_num);
   } else if (var == "TOTAL_PACKETS") {
-    return String(totalPackets);
+    return String(total_packets);
   } else if (var == "PATH") {
     return String(path);
   } else if (var == "TIMESTAMP") {
@@ -297,56 +296,55 @@ String processor(const String& var) {
   }
   return String();
 }
-//formats packet number
-String addZeroes(String num) {
-  if (num.length() == 1) {
-    num = "000" + num;
-  } else if (num.length() == 2) {
-    num = "00" + num;
-  } else if (num.length() == 3) {
-    num = "0" + num;
-  }
-  return num;
-}
+
+
 // when a packet indicating a new photo arrives
-void newPhoto() {
-  if (EEPROMCount == 1000) {
-    EEPROMCount = 0;
+void new_photo() {
+  if (EEPROM_count == 1000) {
+    EEPROM_count = 0;
     EEPROM.begin(EEPROM_SIZE);
-    EEPROMPosition = EEPROM.read(0) + 1;
-    EEPROM.write(0, EEPROMPosition);
+    EEPROM_position = EEPROM.read(0) + 1;
+    EEPROM.write(0, EEPROM_position);
     EEPROM.commit();
   }
-  path = "/picture" + String(EEPROMPosition) + "_" + String(EEPROMCount) + ".jpg"; //path where image will be stored on SD card
-  EEPROMCount++;
+  path = "/picture" + String(EEPROM_position) + "_" + String(EEPROM_count) + ".jpg";  //path where image will be stored on SD card
+  EEPROM_count++;
   Serial.printf("Picture file name: %s\n", path.c_str());
-  photo = SD.open(path.c_str(), FILE_WRITE); //save photo to SD card
+  photo = SD.open(path.c_str(), FILE_WRITE);  //save photo to SD card
   if (!photo) {
     Serial.println("Failed to open photo in writing mode");
   }
-  file = SPIFFS.open(FILE_PHOTO, FILE_WRITE); //save current photo to SPIFFS
+  file = SPIFFS.open(FILE_PHOTO, FILE_WRITE);  //save current photo to SPIFFS
   if (!file) {
     Serial.println("Failed to open file in writing mode");
   }
 }
 //when a photo is fully transmitted
-void endPhoto() {
+void end_photo() {
   file.close();
-  if (!photo){
+  if (!photo) {
     Serial.println("Couldn't save to SD card");
-  }
-  else {
+  } else {
     photo.close();
     Serial.println("Picture saved to SD card");
-    }
+  }
+}
+void send_ack(const byte* packet_number_array) { 
+  Serial.println("Sending ack for packet " + String(packet_number_array[0] + 256 * packet_number_array[1]));
+  LoRa.setSignalBandwidth(bandwidth);
+  LoRa.setSpreadingFactor(spread_factor);
+  LoRa.beginPacket();
+  LoRa.write(packet_number_array[0]);  //write packet number as two byte number
+  LoRa.write(packet_number_array[1]);
+  LoRa.endPacket();
 }
 //updates LCD values
-void lcdUpdate(String stringNum, String totalPackets, int rssi, float snr) {
+void lcd_update(String string_num, String total_packets, int rssi, float snr) {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(stringNum);
+  lcd.print(string_num);
   lcd.setCursor(4, 0);
-  lcd.print("/" + totalPackets);
+  lcd.print("/" + total_packets);
   lcd.setCursor(0, 1);
   lcd.print("RSSI:");
   lcd.setCursor(5, 1);
@@ -354,23 +352,10 @@ void lcdUpdate(String stringNum, String totalPackets, int rssi, float snr) {
   lcd.setCursor(10, 1);
   lcd.print(snr);
 }
-//sets LoRa parameters configuration to the sender, updates own parameters
-void sendConfigPacket(long int bandwidth, int spreadFactor) {
-  Serial.println("Sending config packet to the sender");
-  for (int i = 0; i < 3; i++) {//send multiple times, to ensure the packet is received
-    LoRa.beginPacket();
-    LoRa.print(String(bandwidth) + ":" + String(spreadFactor));
-    LoRa.endPacket();
-    delay(1500);
-    Serial.println(".");
-  }
-  LoRa.setSignalBandwidth(bandwidth);
-  Serial.println("Bandwidth set to " + String(bandwidth));
-  LoRa.setSpreadingFactor(spreadFactor);
-  Serial.println("Spread factor set to " + String(spreadFactor));
-}
+
+
 //updates timestamp
-void getTime() {
+void get_time() {
   time_t now = time(NULL);
   struct tm tm_now;
   localtime_r(&now, &tm_now);
@@ -380,14 +365,14 @@ void getTime() {
   Serial.println(timestamp);
 }
 //if creating soft AP
-void softAP() {
+void soft_AP() {
   WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
 }
 //if connecting to a network
-void wifiConnect() {
+void wifi_connect() {
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -400,14 +385,14 @@ void wifiConnect() {
 void setup() {
   Serial.begin(115200);
 
-  //softAP();
-  wifiConnect();
+  //soft_AP();
+  wifi_connect();
   server.begin();
-  
+
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
     ESP.restart();
-  } 
+  }
   //HSPI is used by LoRa, VSPI is used by SD card reader
   SPIClass* hspi = NULL;
   hspi = new SPIClass(HSPI);
@@ -430,26 +415,30 @@ void setup() {
   //enable error check, highly recommended
   LoRa.enableCrc();
   LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spreadFactor);
+  LoRa.setSpreadingFactor(spread_factor);
   Serial.println("LoRa Initializing OK!");
   delay(500);
   if (!SD.begin()) {
     Serial.println("SD Card Mount Failed");
-  } 
+  }
   EEPROM.begin(EEPROM_SIZE);
-  EEPROMPosition = EEPROM.read(0) + 1;
-  EEPROM.write(0, EEPROMPosition);
+  EEPROM_position = EEPROM.read(0) + 1;
+  EEPROM.write(0, EEPROM_position);
   EEPROM.commit();
-  // http methods 
+  // http methods
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/html", index_html, processor);
   });
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
     if (request->hasParam("bandwidth")) {
       bandwidth = (request->getParam("bandwidth")->value()).toInt();
+      LoRa.setSignalBandwidth(bandwidth);
+      Serial.println("BW is " + String(bandwidth));
     }
-    if (request->hasParam("spreadFactor")) {
-      spreadFactor = (request->getParam("spreadFactor")->value()).toInt();
+    if (request->hasParam("spread_factor")) {
+      spread_factor = (request->getParam("spread_factor")->value()).toInt();
+      LoRa.setSpreadingFactor(spread_factor);
+      Serial.println("SF is " + String(spread_factor));
     }
     request->send(200, "text/plain", "OK");
   });
@@ -462,11 +451,11 @@ void setup() {
   server.on("/snr", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/plain", snr.c_str());
   });
-  server.on("/stringNum", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send_P(200, "text/plain", stringNum.c_str());
+  server.on("/string_num", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send_P(200, "text/plain", string_num.c_str());
   });
-  server.on("/totalPackets", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send_P(200, "text/plain", totalPackets.c_str());
+  server.on("/total_packets", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send_P(200, "text/plain", String(total_packets).c_str());
   });
   server.on("/path", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/plain", path.c_str());
@@ -481,70 +470,63 @@ void setup() {
   lcd.print(WiFi.localIP());
   //clear SPIFFS
   SPIFFS.remove("/photo.jpg");
-  configTime(7200, 0, "ntp.telekom.sk"); //choose correct ntp server for your region, first argument is time shift in seconds
+  configTime(3600, 0, "ntp.telekom.sk");  //choose correct ntp server for your region, first argument is time shift in seconds
   Serial.println("Waiting for a new image");
+  start_millis = millis();
 }
 
 void loop() {
   // try to parse packet
-  int packetSize = LoRa.parsePacket();
-  if (packetSize) {
-    if (packetSize == 4) { //this packet indicates start of new photo
-      newPhoto();
-      totalPackets = LoRa.readString();
-      Serial.println(totalPackets);
-      factor = 0;
-      lastPacket = totalPackets;
-      //update the timestamp
-      getTime();
-    }
-    if (packetSize > 250) { //got a packet containing jpeg data
+    int packet_size = LoRa.parsePacket();
+    if (packet_size) {
       while (LoRa.available()) {
-        String thisNum;
-        for (int i = 0; i < chunkSize; i++) {
-          chunk[i] = LoRa.read(); //read packet byte by byte
-          thisNum = String(chunk[i], HEX); //converts byte to string, for serial output
-          if (thisNum.length() == 1) {
-            thisNum = "0" + thisNum;
-          }
-          stringChunk += thisNum;
+        for (int i = 0; i < chunk_size; i++) {
+          chunk[i] = LoRa.read();  //read packet byte by byte
         }
-        num = LoRa.read(); //reads packet number
+        byte packet_info[4];
+        LoRa.readBytes(packet_info, 4);
+        packet_number = (packet_info[0] + 256 * packet_info[1]); //read packet number
+        total_packets = (packet_info[2] + 256 * packet_info[3]); //read total packets info
       }
-      packetNumber = (factor * 256) + num; //since packet number is stored in one byte ('num'), numbers greater than 255 must be incremented by ('factor'*256)
-      if (num == 255 && num != lastNum) {
-        factor++;
-        lastNum = num;
+      if (packet_number == 1)  //this packet indicates start of new photo
+      {
+        new_photo();
+        get_time();
       }
-      lastNum = num;
-      stringNum = addZeroes(String(packetNumber + 1, DEC));
-
-      if (stringChunk != lastPacket) { //because each packet was sent multiple times, we process only unique packets
-        if (!file) {
-          Serial.println("Failed to open file in writing mode");
-        } else {
-          for (int i = 0; i < chunkSize; i++) {
-            file.write(chunk[i]); //write to SPIFFS
-            photo.write(chunk[i]); //write to SD card
-          }
+      string_num = (String(packet_number)); //this format is used for LCD output
+      Serial.print("Got packet " + string_num + "/" + String(total_packets));
+      rssi = String(LoRa.packetRssi());
+      snr = String(LoRa.packetSnr());
+      Serial.println(" with RSSI: " + rssi + ", SNR: " + snr + " ,packet length= " + String(packet_size));
+      if (!file) {
+        Serial.println("Failed to open file in writing mode");
+      } else {
+        for (int i = 0; i < chunk_size; i++) {
+          file.write(chunk[i]);   //write to SPIFFS
+          photo.write(chunk[i]);  //write to SD card
+          //Serial.print(String(chunk[i],HEX)); //for debugging purposes
         }
-
-        Serial.print(stringNum + ":");
-        Serial.print(stringChunk); //prints HEX values of a packet, for debugging purposes
-        rssi = String(LoRa.packetRssi());
-        snr = String(LoRa.packetSnr());
-        Serial.println(" with RSSI: " + rssi + ", SNR: " + snr + " ,packet length= " + String(packetSize));
-        lastPacket = stringChunk;
+        //Serial.println("");
       }
-      lcdUpdate(stringNum, totalPackets, LoRa.packetRssi(), LoRa.packetSnr());
-      if (packetNumber + 1 == totalPackets.toInt()) { //if received a final packet
-        endPhoto();
+      lcd_update(string_num, String(total_packets), LoRa.packetRssi(), LoRa.packetSnr());
+      current_packet_array[0] = packet_number % 256;
+      current_packet_array[1] = packet_number / 256;
+      send_ack(current_packet_array);
+      if (packet_number == total_packets) {  //if received a final packet
+        current_packet_array[0] = 0;
+        current_packet_array[1] = 0;
+        end_photo();
         lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print("Finished");
-        sendConfigPacket(bandwidth, spreadFactor);
       }
-      stringChunk = "";
     }
+  current_millis = millis();
+  if (current_millis - start_millis >= ack_retransmission_period)  //If no packet is received after a specified period, request retransmission
+  {
+    ack_retransmission_period = random(150, 200);
+    Serial.println("Sending acknowledgment again for packet "+String(current_packet_array[0] + 256 * current_packet_array[1]));
+    send_ack(current_packet_array);
+    start_millis = current_millis;  //IMPORTANT to save the start time
   }
 }
