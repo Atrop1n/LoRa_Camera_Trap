@@ -114,7 +114,15 @@ After you are done, disconnect GPIO0 from GND and connect PIR module according t
 ### Webpage
 After both devices are set up, wave your hand in front of the PIR sensor, to trigger motion detection. You should see changes on the webpage and LCD display. Image was taken and is now being transmitted. All values except image will now be automatically updated every 5 seconds. In order to update the image, refresh the page. Once the image is fully transmitted, it will stay on the screen until a new one is taken. 
 
-If you configure LoRa bandwidth or spreading factor on the webpage, changes will take effect **only** after a picture is fully transmitted. The reason is that all the parameter changes must be applied to both sender and receiver. This is achieved by sending a config packet from receiver to sender. The sender listens for packets only for a short time right after it has finished image transmission.
+If you configure LoRa bandwidth or spreading factor on the webpage, changes will immediately take effect on the receiver. Since both the sender and the receiver need to be
+configured with the same bandwidth and SF, sender will stop receiving acknowledgment packets for a while, since reveicer is now using different parameters. The sender will
+sense this, and after not receiving any acknowldegment packet for a specified period (_ack_wait_timeout_) it will now periodically switch to various combinations of
+BW and SF, listening on the same variation for a period specified by _SF_find_timeout_. When an _ack_ packet is received at a particular combination of BW and SF during this time window, the sender keeps these parameters and transmission continues normally.
+
+Now this part is tricky. If _SF_find_timeout_ is too short, no packet will be received because the time would be insufficient for a packed to be parsed. This is particularly obvious on higher bandwidths and spread factors. 
+If _SF_find_timeout_ is too long, it may take up to several minutes for a sender to finally find the correct combination of BW and SF. 
+Tweak _SF_find_timeout_ so that it suits your particular use scenario. At SF = 7 and BW = 500 kHz 500 ms is usually enough, but SF = 12 and BW = 7,8 kHz would need up to 30 seconds. 
+
 
 ## Common issues
 Here are some issues I came across while working on the project:
@@ -126,4 +134,5 @@ PROBLEM                                                               SOLUTION
 4. There is no photo on the webpage, even if new packets are coming   Refresh the page. If the problem persists, it means the initial packet was not received. Restart both modules and try again. Make sure you start the receiver before the sender.
 5. Pictures contain horizontal stripes and weird discoloring          Some packets were lost. Increase bandwidth, decrease sprad factor, or decrease range. 
 6. Timestamp is shifted by a few hours                                Change the ntp server and adjust the time shift in configTime().
+7. Transmission is stopped after changing bandwidth or SF             Increase value of _SF_find_timeout_ on the sender, up to 30000 ms. 
 ```
