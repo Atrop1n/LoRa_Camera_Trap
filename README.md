@@ -1,19 +1,20 @@
-***I've recently added code for 2.4GHz module. The wiring is different than in the case of 868 MHz module, I'll upload the correct pinout soon. 
-There might be some bugs in this new version, I'll fix them soon as well.***	
+***The wiring of 2,4 GHz module might be different than the standard module. Please refer to the datasheet of your module.***	
 
 # LoRa_Camera_Trap
 Create a remote camera trap using LoRa.
 ## Description
-This project uses LoRa to transmit an image captured by ESP32-CAM. Image is then stored on an SD card on the receiver side and displayed on a web server hosted on the receiver. Transmission time varies between 3 to 30 minutes (HD image), based on bandwidth and spread factor. Higher bandwidth means higher data rate, but shorter range. In order to achieve ideal transmission range, both sender and receiver must be in a line of sight. Only OV2640 camera module is currently supported.
+This project uses LoRa to transmit an image captured by ESP32-CAM. Image is then stored on an SD card on the receiver side and displayed on a web server hosted on the receiver. Transmission time varies between 1 to 30 minutes (HD image), based on bandwidth and spread factor. Higher bandwidth means higher data rate, but shorter range. In order to achieve ideal transmission range, both sender and receiver must be in a line of sight. Only OV2640 camera module is currently supported. This is the one that comes
+with your ESP32-CAM by default.
 ## Hardware requirements
 ```
 1x ESP32-CAM
 1x FTDI adapter for ESP32-CAM
 1x DOIT DevKit V1 ESP32
-2x SX1278 LoRa transceiver module (make sure you get the correct frequency band for your region)
+2x SX127x LoRa transceiver module (make sure you get the correct frequency band for your region)
 1x SD card reader module
 1x PIR motion sensor
 1x I2C LCD display (optional)
+3x Breadboard
 some jumper wires and solder 
 ```
 Pinouts:
@@ -48,7 +49,7 @@ TX                U0R(3), only connect while flashing               SCK         
                                                                
 ![IMG_4349](https://github.com/Atrop1n/LoRa_Camera_Trap/assets/92330911/3eaf3441-0951-4dd6-a62b-ca937e01470b)
 
-You must attach an antenna to you LoRa modules, otherwise you are risking damage to the modules. A piece of insulated wire will do, but adjust the length to the frequency of your module. Antenna should be quarter or half a wavelength long. I have used quarter a wavelength.
+You must attach an antenna to you LoRa modules, otherwise you are risking damage to the modules. A piece of insulated wire will do, but adjust the length to the frequency of your module. Antenna should be quarter or half a wavelength long. I have used quarter a wavelength, that is 8,63 cm (in case of 868 MHz).
 ## Usage
 First you will need to install the following libraries:
 ```
@@ -81,7 +82,7 @@ As a next step, change the ntp server to fit your region in *setup()*. First par
 ```  
 configTime(7200, 0, "your.ntp.server");
 ```  
-You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! These parameters can also be configured on the webpage, where the sender will be configured automatically. More on that later. 
+You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! These parameters can also be configured on the webpage, where the boards will be configured automatically. More on that later. 
 
 To upload code, push the BOOT button on your board as soon as you see dots and underscores, and release it after the board starts booting. After board initialization, connect to IP address printed by the serial monitor. You should see this page:
 ![image](https://user-images.githubusercontent.com/92330911/174888630-2c678a90-a134-433b-b4fb-0a8b3a27c649.png)
@@ -104,7 +105,8 @@ FRAMESIZE_VGA (640 x 480)
 FRAMESIZE_CIF (352 x 288)
 FRAMESIZE_QVGA (320 x 240)
 ```  
-I have not adjusted the image holder on the webpage to contain images of other resolutions than HD, so they may not be displayed correctly.
+I have not adjusted the image holder on the webpage to contain images of other resolutions than HD, so they may not be displayed correctly. They will however be stored
+correctly on the SD card.
 
 You can also change other camera settings, but I won't go into detail on that. 
 
@@ -119,7 +121,7 @@ configured with the same bandwidth and SF, sender will stop receiving acknowledg
 sense this, and after not receiving any acknowldegment packet for a specified period (_ack_wait_timeout_) it will now periodically switch to various combinations of
 BW and SF, listening on the same variation for a period specified by _SF_find_timeout_. When an _ack_ packet is received at a particular combination of BW and SF during this time window, the sender keeps these parameters and transmission continues normally.
 
-Now this part is tricky. If _SF_find_timeout_ is too short, no packet will be received because the time would be insufficient for a packed to be parsed. This is particularly obvious on higher bandwidths and spread factors. 
+Now this part is tricky. If _SF_find_timeout_ is too short, no packet will be received because the time would be insufficient for a packed to be parsed. This is particularly obvious on low bandwidths and high spread factors. 
 If _SF_find_timeout_ is too long, it may take up to several minutes for a sender to finally find the correct combination of BW and SF. 
 Tweak _SF_find_timeout_ so that it suits your particular use scenario. At SF = 7 and BW = 500 kHz 500 ms is usually enough, but SF = 12 and BW = 7,8 kHz would need up to 30 seconds. 
 
@@ -130,8 +132,8 @@ Here are some issues I came across while working on the project:
 PROBLEM                                                               SOLUTION
 1. LoRa won't initialize                                              Make sure the module is connected exactly according to the pinout.
 2. Reciever is not getting any packets                                Make sure both modules are configured with the exact same bandwidth, spread factor, and coding rate. Keep the RSSI above -120 dBm and SNR above 0. Also don't forget to trigger the motion sensor!
-3. Pictures are too brigth                                            Move the camera out of direct sun, or take extra dummy pictures before transmitting.
-4. There is no photo on the webpage, even if new packets are coming   Refresh the page. If the problem persists, it means the initial packet was not received. Restart both modules and try again. Make sure you start the receiver before the sender.
+3. Pictures are too brigth                                            Move the camera out of direct sun, or take extra dummy pictures before transmitting. Adjusting camera settings might help as well.
+4. There is no photo on the webpage, even if new packets are coming   Refresh the page. If the problem persists, it means the initial packet was not received. Restart both modules and try again. Make sure you start the receiver before the sender, to make sure the initial packet is received.
 5. Pictures contain horizontal stripes and weird discoloring          Some packets were lost. Increase bandwidth, decrease sprad factor, or decrease range. 
 6. Timestamp is shifted by a few hours                                Change the ntp server and adjust the time shift in configTime().
 7. Transmission is stopped after changing bandwidth or SF             Increase value of _SF_find_timeout_ on the sender, up to 30000 ms. 
