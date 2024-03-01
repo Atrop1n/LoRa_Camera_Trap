@@ -42,7 +42,7 @@ int total_packets = 0;
 unsigned long start_millis = 0;
 unsigned long current_millis = 0;
 int ack_wait_timeout = 5000;
-int SF_find_timeout = 300;
+int SF_find_timeout = 300; //increase this value up to 30000 if transmission is stopped after BW of SF changes. 
 byte total_packets_array[2];
 byte packet_number_array[2];
 
