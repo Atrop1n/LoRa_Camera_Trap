@@ -152,7 +152,7 @@ int findSF() {
 }
 
 void find_BW() {
-  Serial.println("I have got no acknowledgement from the receiver in "+String(ack_wait_timeout/10000)+" seconds.\nMaybe it switched to a different bandwidth and spreading factor. \nNow I will attemp to try these values.");
+  Serial.println("I have got no acknowledgement from the receiver in "+String(ack_wait_timeout/1000)+" seconds.\nMaybe it switched to a different bandwidth and spreading factor. \nNow I will attemp to try these values.");
   while (true) {
     LoRa.setSignalBandwidth(7800);
     Serial.println("Trying BW 7800");
