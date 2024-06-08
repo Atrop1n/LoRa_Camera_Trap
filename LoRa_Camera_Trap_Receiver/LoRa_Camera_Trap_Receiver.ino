@@ -51,13 +51,13 @@ File photo;
 int EEPROM_count = 0;
 int bandwidth = 125000;
 int spread_factor = 8;
-int txpower = 20;
+int txpower = 17;
 long int lorafreq = 433E6; //replace the LoRa.begin(---E-) argument with your location's frequency (866E6 or 915E6)
 String rssi;
 String snr;
 String path;
 String timestamp;
-int ack_retransmission_period = random(150, 200);
+int ack_retransmission_period = 1000;
 unsigned long start_millis;
 unsigned long current_millis;
 const char index_html[] PROGMEM = R"rawliteral(
@@ -429,7 +429,7 @@ void loop() {
   current_millis = millis();
   if (current_millis - start_millis >= ack_retransmission_period)  //If no packet is received after a specified period, request retransmission
   {
-    ack_retransmission_period = random(150, 200);
+    ack_retransmission_period = 1000;
     Serial.println("Sending acknowledgment again for packet "+String(current_packet_array[0] + 256 * current_packet_array[1]));
     send_ack(current_packet_array);
     start_millis = current_millis;  //IMPORTANT to save the start time
