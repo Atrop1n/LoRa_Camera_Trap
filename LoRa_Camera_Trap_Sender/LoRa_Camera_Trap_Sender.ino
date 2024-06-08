@@ -39,7 +39,7 @@ int movement_status;
 long int bandwidth = 125000;
 long int lorafreq = 433E6; //replace the LoRa.begin(---E-) argument with your location's frequency (866E6 or 915E6)
 int spread_factor = 8;  //7-12
-int txpower = 20; //Sets transmission output power. Allowed values range from 2 to 17 dBm
+int txpower = 17; //Sets transmission output power. Allowed values range from 2 to 17 dBm
 int total_packets = 0;
 unsigned long start_millis = 0;
 unsigned long current_millis = 0;
