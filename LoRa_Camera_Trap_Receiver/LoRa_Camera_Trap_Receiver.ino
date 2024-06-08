@@ -32,8 +32,8 @@
 
 int EEPROM_position = 0;
 
-const char* ssid = "Your_access_point";
-const char* password = "Your_password";
+const char* ssid = "";
+const char* password = "";
 
 AsyncWebServer server(80);
 
@@ -49,8 +49,10 @@ LiquidCrystal_I2C lcd(0x27, lcd_columns, lcd_rows);
 File file;
 File photo;
 int EEPROM_count = 0;
-int bandwidth = 500000;
-int spread_factor = 7;
+int bandwidth = 125000;
+int spread_factor = 8;
+int txpower = 20;
+long int lorafreq = 433E6; //replace the LoRa.begin(---E-) argument with your location's frequency (866E6 or 915E6)
 String rssi;
 String snr;
 String path;
@@ -107,18 +109,6 @@ const char index_html[] PROGMEM = R"rawliteral(
          width: 768px;
          height: 432px;
       }
-      .sidebar {
-         float: left;
-         top: 104px;
-         max-width: 17%%;
-         position: absolute;
-         left: 22px;
-      }
-      .options {
-         padding: 3px;
-         box-shadow: 1px 1px 5px rgb(0, 0, 0);
-         border-radius: 1px;
-      }
       .picture-holder {
          margin-top: 5px;
          margin-bottom: 5px;
@@ -153,18 +143,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             padding: 0px;
             margin: auto;
          }
-         .sidebar {
-            position: relative;
-            margin: auto;
-            max-width: none;
-            top: auto;
-            margin-top: 8px;
-            float: none;
-            left: auto;
-         }
-         .options{
-           display: inline-block
-         }
          .picture-holder {
             height: auto;
             width: auto;
@@ -196,44 +174,7 @@ const char index_html[] PROGMEM = R"rawliteral(
    <div class="rssi"><span class="indented">Last packet RSSI: <strong><span
                id="rssi">%RSSI%</span></strong>&nbspdBm</span><span class="snr">Last packet SNR: <strong> <span
                id="snr"> %SNR%</span></strong> dB</span></div>
-  <div class="sidebar">
-      <table class="options">
-         <tbody>
-         <tr class="parameter">
-            <td>
-            <label for="bandwidth">Bandwidth (kHz)</label></td>
-            <td>
-            <select onchange="getBandwidth(), retain()" name="bandwidth" id="bandwidth" class="dropdown-menu">
-               <option value="7800">7.8</option>
-               <option value="10400">10.4</option>
-               <option value="15600">15.6</option>
-               <option value="20800">20.8</option>
-               <option value="31250">31.25</option>
-               <option value="41700">41.7</option>
-               <option value="62500">62.5</option>
-               <option value="125000">125</option>
-               <option value="250000">250</option>
-               <option value="500000">500</option>
-            </select>
-         </td>
-         </tr>
-            <tr class="parameter">
-               <td style="text-align: left;"><label for="spread_factor">Spread factor</label></td>
-               <td>
-               <select onchange="getspread_factor(), retain()" name="spread_factor" id="spread_factor" class="dropdown-menu">
-                  <option value="7"  selected>7</option>
-                  <option value="8">8</option>
-                  <option value="9">9</option>
-                  <option value="10">10</option>
-                  <option value="11">11</option>
-                  <option value="12">12</option>               
-               </select>
-            </td>
-            </tr>
-         </tbody>
-         </table>
-         <p id="demo" style="margin-top:5px"></p>
-      </div>
+  
    <script>
       setInterval(updateValues, 5000, "rssi");
       setInterval(updateValues, 5000, "total_packets");
@@ -251,30 +192,6 @@ const char index_html[] PROGMEM = R"rawliteral(
          };
          xhttp.open("GET", "/" + value, true);
          xhttp.send();
-      }
-      function getBandwidth(value) {
-         var xhttp = new XMLHttpRequest();
-         var x = document.getElementById("bandwidth").value;
-         document.getElementById("demo").innerHTML = "Bandwidth set to " + x;
-         xhttp.open("GET", "/update?bandwidth="+x, true);
-         xhttp.send();
-      }
-       function getspread_factor(value) {
-         var xhttp = new XMLHttpRequest();
-         var x = document.getElementById("spread_factor").value;
-         document.getElementById("demo").innerHTML = "Spread factor set to " + x;
-         xhttp.open("GET", "/update?spread_factor="+ x, true);
-         xhttp.send();
-      }
-       function retain(value) {
-         sessionStorage.setItem("sf", document.getElementById("spread_factor").value);
-         sessionStorage.setItem("bw", document.getElementById("bandwidth").value);
-      }
-      window.onload = function() {
-         {
-            document.getElementById('spread_factor').value=sessionStorage.getItem("sf");
-            document.getElementById('bandwidth').value=sessionStorage.getItem("bw");
-         }
       };
    </script>
 </body>
@@ -333,6 +250,7 @@ void send_ack(const byte* packet_number_array) {
   Serial.println("Sending ack for packet " + String(packet_number_array[0] + 256 * packet_number_array[1]));
   LoRa.setSignalBandwidth(bandwidth);
   LoRa.setSpreadingFactor(spread_factor);
+  LoRa.setTxPower(txpower);
   LoRa.beginPacket();
   LoRa.write(packet_number_array[0]);  //write packet number as two byte number
   LoRa.write(packet_number_array[1]);
@@ -400,11 +318,10 @@ void setup() {
   LoRa.setSPI(*hspi);
   SPI.begin(18, 19, 23, 5);
   LoRa.setPins(SS, RST, DIO0);
-  //replace the LoRa.begin(---E-) argument with your location's frequency
-  //433E6 for Asia
-  //866E6 for Europe
-  //915E6 for North America
-  while (!LoRa.begin(866E6)) {
+  LoRa.setSignalBandwidth(bandwidth);
+  LoRa.setSpreadingFactor(spread_factor);
+  LoRa.setTxPower(txpower);
+  while (!LoRa.begin(lorafreq)) {
     Serial.println(".");
     delay(500);
   }
@@ -414,8 +331,6 @@ void setup() {
   LoRa.setSyncWord(0x6C);
   //enable error check, highly recommended
   LoRa.enableCrc();
-  LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spread_factor);
   Serial.println("LoRa Initializing OK!");
   delay(500);
   if (!SD.begin()) {
@@ -430,16 +345,6 @@ void setup() {
     request->send_P(200, "text/html", index_html, processor);
   });
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
-    if (request->hasParam("bandwidth")) {
-      bandwidth = (request->getParam("bandwidth")->value()).toInt();
-      LoRa.setSignalBandwidth(bandwidth);
-      Serial.println("BW is " + String(bandwidth));
-    }
-    if (request->hasParam("spread_factor")) {
-      spread_factor = (request->getParam("spread_factor")->value()).toInt();
-      LoRa.setSpreadingFactor(spread_factor);
-      Serial.println("SF is " + String(spread_factor));
-    }
     request->send(200, "text/plain", "OK");
   });
   server.on("/saved-photo", HTTP_GET, [](AsyncWebServerRequest* request) {
