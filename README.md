@@ -1,4 +1,9 @@
-***The wiring of 2,4 GHz module might be different than the standard module. Please refer to the datasheet of your module.***	
+This is a fork of the project https://github.com/Atrop1n/LoRa_Camera_Trap
+
+The following changes are planned.
+1) Remove the FindSW and FindBW functions. Make the SW and BW parameters fixed. Since the ability to change these values ​​is needed only during the period of studying the behavior of the receiver and transmitter. In real conditions, this is unnecessary functionality.
+
+2) Add on the receiver side the ability to transmit data using a telegram bot.
 
 # LoRa_Camera_Trap
 Create a remote camera trap using LoRa.
