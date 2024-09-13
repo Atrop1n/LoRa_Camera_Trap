@@ -80,8 +80,7 @@ As a next step, change the ntp server to fit your region in *setup()*. First par
 ```  
 configTime(7200, 0, "your.ntp.server");
 ```  
-You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! These parameters can also be configured on the webpage, where the boards will be configured automatically. More on that later. 
-
+You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! 
 To upload code, push the BOOT button on your board as soon as you see dots and underscores, and release it after the board starts booting. After board initialization, connect to IP address printed by the serial monitor. You should see this page:
 ![image](https://user-images.githubusercontent.com/92330911/174888630-2c678a90-a134-433b-b4fb-0a8b3a27c649.png)
 
