@@ -176,13 +176,14 @@ void setup() {
   SPI.begin(SCK, MISO, MOSI, SS);
   //LoRa init
   LoRa.setPins(SS, RST, DIO0);
-  LoRa.setTxPower(txpower);
-  LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spread_factor);
   while (!LoRa.begin(lorafreq)) {
     Serial.println(".");
     delay(500);
   }
+  LoRa.setTxPower(txpower);
+  LoRa.setSignalBandwidth(bandwidth);
+  LoRa.setSpreadingFactor(spread_factor);
+  
   // Change sync word (0xF3) to match the receiver
   // The sync word assures you don't get LoRa messages from other LoRa transceivers
   // ranges from 0-0xFF
