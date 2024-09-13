@@ -34,21 +34,19 @@
 #define PCLK_GPIO_NUM 22
 
 
-static int chunk_size = 250;  //size of jpeg data in a single packet, max 250
-int movement_status;
-long int bandwidth = 125000;
-long int lorafreq = 433E6; //replace the LoRa.begin(---E-) argument with your location's frequency (866E6 or 915E6)
-int spread_factor = 8;  //7-12
+static byte chunk_size = 250;  //size of jpeg data in a single packet, max 250
+byte movement_status;
+long int bandwidth = 500000;
+long int lorafreq = 866E6; //replace the LoRa.begin(---E-) argument with your module's frequency (433E6, 866E6 or 915E6)
+byte spread_factor = 7;  //7-12
 int txpower = 17; //Sets transmission output power. Allowed values range from 2 to 17 dBm
-int total_packets = 0;
+uint16_t total_packets = 0;
 unsigned long start_millis = 0;
 unsigned long current_millis = 0;
-int ack_wait_timeout = 5000;
-int SF_find_timeout = 300; //increase this value up to 30000 if transmission is stopped after BW of SF changes. 
 byte total_packets_array[2];
 byte packet_number_array[2];
 
-void send_chunk(int packet_number, camera_fb_t* fb) {
+void send_chunk(uint16_t packet_number, camera_fb_t* fb) {
   uint8_t chunk[chunk_size];
   memcpy(chunk, (fb->buf) + (chunk_size * (packet_number - 1)), chunk_size);
   Serial.println("Sending packet: " + String(packet_number));
@@ -60,7 +58,7 @@ void send_chunk(int packet_number, camera_fb_t* fb) {
   //Serial.println("");
   LoRa.write(packet_number_array[0]);  //write packet number as two byte number
   LoRa.write(packet_number_array[1]);
-  LoRa.write(total_packets_array[0]);  //write total packets count as two byte number
+  LoRa.write(total_packets_array[0]);  //write total packet count as two byte number
   LoRa.write(total_packets_array[1]);
   LoRa.endPacket();
 }
@@ -73,7 +71,7 @@ int wait_for_ack(int packet_number)  //return 1 for OK, return 0 for retransmiss
       byte packet_confirmation_array[2];
       while (LoRa.available()) {
         LoRa.readBytes(packet_confirmation_array, 2);
-        int packet_confirmation = packet_confirmation_array[0] + 256 * packet_confirmation_array[1];
+        uint16_t packet_confirmation = (packet_confirmation_array[1] << 8) | packet_confirmation_array[0];
         if (packet_confirmation != packet_number) {
           Serial.println("Expected confirmation for packet " + String(packet_number) + ", got confirmation for packet " + String(packet_confirmation) + ". Sending packet " + String(packet_number) + " again...");
           return 0;
@@ -116,11 +114,11 @@ void take_pic(bool transmit) {
     Serial.println("Size of picture is: " + String(size) + " bytes");
     total_packets = (size / chunk_size) + 1;
     Serial.println("Total number of packets to transmit: " + String(total_packets));
-    total_packets_array[0] = total_packets % 256;
-    total_packets_array[1] = total_packets / 256;
+    total_packets_array[0] = total_packets;
+    total_packets_array[1] = total_packets >> 8;
     for (int i = 1; i <= total_packets; i++) {  //sends all the chunks
-      packet_number_array[0] = i % 256;
-      packet_number_array[1] = i / 256;
+      packet_number_array[0] = i;
+      packet_number_array[1] = i >> 8;
       send_chunk(i, fb);
 
       while (wait_for_ack(i) == 0) {
