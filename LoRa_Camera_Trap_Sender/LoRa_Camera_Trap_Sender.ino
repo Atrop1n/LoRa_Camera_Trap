@@ -34,15 +34,15 @@
 #define PCLK_GPIO_NUM 22
 
 
-static int chunk_size = 250;  //size of jpeg data in a single packet, max 250
-int movement_status;
+static byte chunk_size = 250;  //size of jpeg data in a single packet, max 250
+byte movement_status;
 long int bandwidth = 500000;
-int spread_factor = 7;  //7-12
-int total_packets = 0;
+byte spread_factor = 7;  //7-12
+uint16_t total_packets = 0;
 unsigned long start_millis = 0;
 unsigned long current_millis = 0;
-int ack_wait_timeout = 5000;
-int SF_find_timeout = 300; //increase this value up to 30000 if transmission is stopped after BW of SF changes. 
+int ack_wait_timeout = 10000;
+int SF_find_timeout = 1000; //increase this value up to 30000 if transmission is stopped after BW of SF changes. 
 byte total_packets_array[2];
 byte packet_number_array[2];
 
@@ -235,7 +235,7 @@ int wait_for_ack(int packet_number)  //return 1 for OK, return 0 for retransmiss
       byte packet_confirmation_array[2];
       while (LoRa.available()) {
         LoRa.readBytes(packet_confirmation_array, 2);
-        int packet_confirmation = packet_confirmation_array[0] + 256 * packet_confirmation_array[1];
+        uint16_t packet_confirmation = (packet_confirmation_array[1] << 8) | packet_confirmation_array[0];
         if (packet_confirmation != packet_number) {
           Serial.println("Expected confirmation for packet " + String(packet_number) + ", got confirmation for packet " + String(packet_confirmation) + ". Sending packet " + String(packet_number) + " again...");
           return 0;
@@ -278,11 +278,11 @@ void take_pic(bool transmit) {
     Serial.println("Size of picture is: " + String(size) + " bytes");
     total_packets = (size / chunk_size) + 1;
     Serial.println("Total number of packets to transmit: " + String(total_packets));
-    total_packets_array[0] = total_packets % 256;
-    total_packets_array[1] = total_packets / 256;
+    total_packets_array[0] = total_packets;
+    total_packets_array[1] = total_packets >> 8;
     for (int i = 1; i <= total_packets; i++) {  //sends all the chunks
-      packet_number_array[0] = i % 256;
-      packet_number_array[1] = i / 256;
+      packet_number_array[0] = i;
+      packet_number_array[1] = i >> 8;
       send_chunk(i, fb);
 
       while (wait_for_ack(i) == 0) {
