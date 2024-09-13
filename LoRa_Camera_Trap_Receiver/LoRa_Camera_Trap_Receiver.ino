@@ -32,30 +32,29 @@
 
 int EEPROM_position = 0;
 
-const char* ssid = "Your_access_point";
-const char* password = "Your_password";
+const char* ssid = "";
+const char* password = "";
 
 AsyncWebServer server(80);
 
-int total_packets;
-const int chunk_size = 250;
+uint16_t packet_number;
+uint16_t total_packets;
+const byte chunk_size = 250;
 byte chunk[chunk_size];
-int packet_number;
 byte current_packet_array[2];
-String string_num;
-int lcd_columns = 16;
-int lcd_rows = 2;
+byte lcd_columns = 16;
+byte lcd_rows = 2;
 LiquidCrystal_I2C lcd(0x27, lcd_columns, lcd_rows);
 File file;
 File photo;
 int EEPROM_count = 0;
 int bandwidth = 500000;
-int spread_factor = 7;
+byte spread_factor = 7;
 String rssi;
 String snr;
 String path;
 String timestamp;
-int ack_retransmission_period = random(150, 200);
+int ack_retransmission_period = 250;
 unsigned long start_millis;
 unsigned long current_millis;
 const char index_html[] PROGMEM = R"rawliteral(
@@ -286,7 +285,7 @@ String processor(const String& var) {
   } else if (var == "SNR") {
     return String(snr);
   } else if (var == "STRING_NUM") {
-    return String(string_num);
+    return String(packet_number);
   } else if (var == "TOTAL_PACKETS") {
     return String(total_packets);
   } else if (var == "PATH") {
@@ -330,9 +329,7 @@ void end_photo() {
   }
 }
 void send_ack(const byte* packet_number_array) { 
-  Serial.println("Sending ack for packet " + String(packet_number_array[0] + 256 * packet_number_array[1]));
-  LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spread_factor);
+  Serial.println("Sending ack for packet " + String(packet_number_array[1] << 8 | packet_number_array[0]));
   LoRa.beginPacket();
   LoRa.write(packet_number_array[0]);  //write packet number as two byte number
   LoRa.write(packet_number_array[1]);
@@ -452,7 +449,7 @@ void setup() {
     request->send_P(200, "text/plain", snr.c_str());
   });
   server.on("/string_num", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send_P(200, "text/plain", string_num.c_str());
+    request->send_P(200, "text/plain", String(packet_number).c_str());
   });
   server.on("/total_packets", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/plain", String(total_packets).c_str());
@@ -485,16 +482,15 @@ void loop() {
         }
         byte packet_info[4];
         LoRa.readBytes(packet_info, 4);
-        packet_number = (packet_info[0] + 256 * packet_info[1]); //read packet number
-        total_packets = (packet_info[2] + 256 * packet_info[3]); //read total packets info
+        packet_number = (packet_info[1] << 8) | packet_info[0]; //read packet number
+        total_packets = (packet_info[3] << 8) | packet_info[2]; //read total packets info
       }
       if (packet_number == 1)  //this packet indicates start of new photo
       {
         new_photo();
         get_time();
       }
-      string_num = (String(packet_number)); //this format is used for LCD output
-      Serial.print("Got packet " + string_num + "/" + String(total_packets));
+      Serial.print("Got packet " + String(packet_number) + "/" + String(total_packets));
       rssi = String(LoRa.packetRssi());
       snr = String(LoRa.packetSnr());
       Serial.println(" with RSSI: " + rssi + ", SNR: " + snr + " ,packet length= " + String(packet_size));
@@ -508,9 +504,9 @@ void loop() {
         }
         //Serial.println("");
       }
-      lcd_update(string_num, String(total_packets), LoRa.packetRssi(), LoRa.packetSnr());
-      current_packet_array[0] = packet_number % 256;
-      current_packet_array[1] = packet_number / 256;
+      lcd_update(String(packet_number), String(total_packets), LoRa.packetRssi(), LoRa.packetSnr());
+      current_packet_array[0] = packet_number;
+      current_packet_array[1] = packet_number >> 8;
       send_ack(current_packet_array);
       if (packet_number == total_packets) {  //if received a final packet
         current_packet_array[0] = 0;
@@ -520,12 +516,12 @@ void loop() {
         lcd.setCursor(0, 0);
         lcd.print("Finished");
       }
+      start_millis = millis();
     }
   current_millis = millis();
   if (current_millis - start_millis >= ack_retransmission_period)  //If no packet is received after a specified period, request retransmission
   {
-    ack_retransmission_period = random(150, 200);
-    Serial.println("Sending acknowledgment again for packet "+String(current_packet_array[0] + 256 * current_packet_array[1]));
+    Serial.println("Sending acknowledgment again for packet "+String((current_packet_array[1] << 8) | current_packet_array[0]));
     send_ack(current_packet_array);
     start_millis = current_millis;  //IMPORTANT to save the start time
   }
