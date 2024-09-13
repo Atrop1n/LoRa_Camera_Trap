@@ -56,7 +56,7 @@ String rssi;
 String snr;
 String path;
 String timestamp;
-uint16_t ack_retransmission_period = 1000;
+uint16_t ack_retransmission_period = 1000; //Increase this value when using low BW/ high SF so that packets have enough time to be parsed
 unsigned long start_millis;
 unsigned long current_millis;
 const char index_html[] PROGMEM = R"rawliteral(
@@ -314,9 +314,6 @@ void setup() {
   LoRa.setSPI(*hspi);
   SPI.begin(18, 19, 23, 5);
   LoRa.setPins(SS, RST, DIO0);
-  LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spread_factor);
-  LoRa.setTxPower(txpower);
   while (!LoRa.begin(lorafreq)) {
     Serial.println(".");
     delay(500);
@@ -327,6 +324,9 @@ void setup() {
   LoRa.setSyncWord(0x6C);
   //enable error check, highly recommended
   LoRa.enableCrc();
+  LoRa.setSignalBandwidth(bandwidth);
+  LoRa.setSpreadingFactor(spread_factor);
+  LoRa.setTxPower(txpower);
   Serial.println("LoRa Initializing OK!");
   delay(500);
   if (!SD.begin()) {
