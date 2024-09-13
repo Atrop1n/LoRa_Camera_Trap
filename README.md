@@ -2,6 +2,9 @@
 
 In this branch, I am trying to implement real-time bandwidth and spread factor adjustments via the webpage.
 
+![image](https://github.com/user-attachments/assets/43cfc6f4-adad-44ce-8d2e-26a340fdaa2b)
+
+
 If you configure LoRa bandwidth or spreading factor on the webpage, changes will immediately take effect on the receiver. Since both the sender and the receiver need to be
 configured with the same bandwidth and SF, sender will stop receiving acknowledgment packets for a while, since reveicer is now using different parameters. The sender will
 sense this, and after not receiving any acknowldegment packet for a specified period (_ack_wait_timeout_) it will now periodically switch to various combinations of
