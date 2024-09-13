@@ -82,7 +82,8 @@ configTime(7200, 0, "your.ntp.server");
 ```  
 You may want to change LoRa bandwidth and spread factor as well, which are set to 500kHz, and 7 by default. In that case, you will need to do the same changes on sender module too, otherwise you will not receive any packets! 
 To upload code, push the BOOT button on your board as soon as you see dots and underscores, and release it after the board starts booting. After board initialization, connect to IP address printed by the serial monitor. You should see this page:
-![image](https://user-images.githubusercontent.com/92330911/174888630-2c678a90-a134-433b-b4fb-0a8b3a27c649.png)
+
+![image](https://github.com/user-attachments/assets/02634634-09d2-4464-a8b4-cf3471d03bbf)
 
 Values are empty, because no photo has been captured yet. In order to do so, let's set up the sender module.
 ### SENDER
