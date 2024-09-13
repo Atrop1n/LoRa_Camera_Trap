@@ -32,30 +32,31 @@
 
 int EEPROM_position = 0;
 
-const char* ssid = "Your_access_point";
-const char* password = "Your_password";
+const char* ssid = "";
+const char* password = "";
 
 AsyncWebServer server(80);
 
-int total_packets;
-const int chunk_size = 250;
+uint16_t total_packets;
+uint16_t packet_number;
+const byte chunk_size = 250;
 byte chunk[chunk_size];
-int packet_number;
 byte current_packet_array[2];
-String string_num;
-int lcd_columns = 16;
-int lcd_rows = 2;
+byte lcd_columns = 16;
+byte lcd_rows = 2;
 LiquidCrystal_I2C lcd(0x27, lcd_columns, lcd_rows);
 File file;
 File photo;
 int EEPROM_count = 0;
 int bandwidth = 500000;
-int spread_factor = 7;
+byte spread_factor = 7;
+byte txpower = 17;
+long int lorafreq = 866E6; //replace the LoRa.begin(---E-) argument with your module's frequency (433E6, 866E6 or 915E6)
 String rssi;
 String snr;
 String path;
 String timestamp;
-int ack_retransmission_period = random(150, 200);
+uint16_t ack_retransmission_period = 1000; //Increase this value when using low BW/ high SF so that packets have enough time to be parsed
 unsigned long start_millis;
 unsigned long current_millis;
 const char index_html[] PROGMEM = R"rawliteral(
@@ -107,18 +108,6 @@ const char index_html[] PROGMEM = R"rawliteral(
          width: 768px;
          height: 432px;
       }
-      .sidebar {
-         float: left;
-         top: 104px;
-         max-width: 17%%;
-         position: absolute;
-         left: 22px;
-      }
-      .options {
-         padding: 3px;
-         box-shadow: 1px 1px 5px rgb(0, 0, 0);
-         border-radius: 1px;
-      }
       .picture-holder {
          margin-top: 5px;
          margin-bottom: 5px;
@@ -153,18 +142,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             padding: 0px;
             margin: auto;
          }
-         .sidebar {
-            position: relative;
-            margin: auto;
-            max-width: none;
-            top: auto;
-            margin-top: 8px;
-            float: none;
-            left: auto;
-         }
-         .options{
-           display: inline-block
-         }
          .picture-holder {
             height: auto;
             width: auto;
@@ -184,7 +161,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
    <h2 class="title">LoRa camera trap</h2>
-   <p class="file_name" id="file_name">Last photo <strong><span id="path">%PATH%</span></strong> was captured at
+   <p class="file_name" id="file_name">Last photo <strong><span id="path">%PATH%</span></strong> was captured on
       <strong></strong><span id="timestamp" style="font-weight: 600;">%TIMESTAMP%</span></strong>
    </p>
    <p class="p"></p>
@@ -196,44 +173,7 @@ const char index_html[] PROGMEM = R"rawliteral(
    <div class="rssi"><span class="indented">Last packet RSSI: <strong><span
                id="rssi">%RSSI%</span></strong>&nbspdBm</span><span class="snr">Last packet SNR: <strong> <span
                id="snr"> %SNR%</span></strong> dB</span></div>
-  <div class="sidebar">
-      <table class="options">
-         <tbody>
-         <tr class="parameter">
-            <td>
-            <label for="bandwidth">Bandwidth (kHz)</label></td>
-            <td>
-            <select onchange="getBandwidth(), retain()" name="bandwidth" id="bandwidth" class="dropdown-menu">
-               <option value="7800">7.8</option>
-               <option value="10400">10.4</option>
-               <option value="15600">15.6</option>
-               <option value="20800">20.8</option>
-               <option value="31250">31.25</option>
-               <option value="41700">41.7</option>
-               <option value="62500">62.5</option>
-               <option value="125000">125</option>
-               <option value="250000">250</option>
-               <option value="500000">500</option>
-            </select>
-         </td>
-         </tr>
-            <tr class="parameter">
-               <td style="text-align: left;"><label for="spread_factor">Spread factor</label></td>
-               <td>
-               <select onchange="getspread_factor(), retain()" name="spread_factor" id="spread_factor" class="dropdown-menu">
-                  <option value="7"  selected>7</option>
-                  <option value="8">8</option>
-                  <option value="9">9</option>
-                  <option value="10">10</option>
-                  <option value="11">11</option>
-                  <option value="12">12</option>               
-               </select>
-            </td>
-            </tr>
-         </tbody>
-         </table>
-         <p id="demo" style="margin-top:5px"></p>
-      </div>
+  
    <script>
       setInterval(updateValues, 5000, "rssi");
       setInterval(updateValues, 5000, "total_packets");
@@ -251,30 +191,6 @@ const char index_html[] PROGMEM = R"rawliteral(
          };
          xhttp.open("GET", "/" + value, true);
          xhttp.send();
-      }
-      function getBandwidth(value) {
-         var xhttp = new XMLHttpRequest();
-         var x = document.getElementById("bandwidth").value;
-         document.getElementById("demo").innerHTML = "Bandwidth set to " + x;
-         xhttp.open("GET", "/update?bandwidth="+x, true);
-         xhttp.send();
-      }
-       function getspread_factor(value) {
-         var xhttp = new XMLHttpRequest();
-         var x = document.getElementById("spread_factor").value;
-         document.getElementById("demo").innerHTML = "Spread factor set to " + x;
-         xhttp.open("GET", "/update?spread_factor="+ x, true);
-         xhttp.send();
-      }
-       function retain(value) {
-         sessionStorage.setItem("sf", document.getElementById("spread_factor").value);
-         sessionStorage.setItem("bw", document.getElementById("bandwidth").value);
-      }
-      window.onload = function() {
-         {
-            document.getElementById('spread_factor').value=sessionStorage.getItem("sf");
-            document.getElementById('bandwidth').value=sessionStorage.getItem("bw");
-         }
       };
    </script>
 </body>
@@ -286,7 +202,7 @@ String processor(const String& var) {
   } else if (var == "SNR") {
     return String(snr);
   } else if (var == "STRING_NUM") {
-    return String(string_num);
+    return String(packet_number);
   } else if (var == "TOTAL_PACKETS") {
     return String(total_packets);
   } else if (var == "PATH") {
@@ -330,11 +246,9 @@ void end_photo() {
   }
 }
 void send_ack(const byte* packet_number_array) { 
-  Serial.println("Sending ack for packet " + String(packet_number_array[0] + 256 * packet_number_array[1]));
-  LoRa.setSignalBandwidth(bandwidth);
-  LoRa.setSpreadingFactor(spread_factor);
+  Serial.println("Sending ack for packet " + String(packet_number_array[1] << 8 | packet_number_array[0]));
   LoRa.beginPacket();
-  LoRa.write(packet_number_array[0]);  //write packet number as two byte number
+  LoRa.write(packet_number_array[0]);  //write packet number as two byte integer
   LoRa.write(packet_number_array[1]);
   LoRa.endPacket();
 }
@@ -400,11 +314,7 @@ void setup() {
   LoRa.setSPI(*hspi);
   SPI.begin(18, 19, 23, 5);
   LoRa.setPins(SS, RST, DIO0);
-  //replace the LoRa.begin(---E-) argument with your location's frequency
-  //433E6 for Asia
-  //866E6 for Europe
-  //915E6 for North America
-  while (!LoRa.begin(866E6)) {
+  while (!LoRa.begin(lorafreq)) {
     Serial.println(".");
     delay(500);
   }
@@ -416,6 +326,7 @@ void setup() {
   LoRa.enableCrc();
   LoRa.setSignalBandwidth(bandwidth);
   LoRa.setSpreadingFactor(spread_factor);
+  LoRa.setTxPower(txpower);
   Serial.println("LoRa Initializing OK!");
   delay(500);
   if (!SD.begin()) {
@@ -430,16 +341,6 @@ void setup() {
     request->send_P(200, "text/html", index_html, processor);
   });
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
-    if (request->hasParam("bandwidth")) {
-      bandwidth = (request->getParam("bandwidth")->value()).toInt();
-      LoRa.setSignalBandwidth(bandwidth);
-      Serial.println("BW is " + String(bandwidth));
-    }
-    if (request->hasParam("spread_factor")) {
-      spread_factor = (request->getParam("spread_factor")->value()).toInt();
-      LoRa.setSpreadingFactor(spread_factor);
-      Serial.println("SF is " + String(spread_factor));
-    }
     request->send(200, "text/plain", "OK");
   });
   server.on("/saved-photo", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -452,7 +353,7 @@ void setup() {
     request->send_P(200, "text/plain", snr.c_str());
   });
   server.on("/string_num", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send_P(200, "text/plain", string_num.c_str());
+    request->send_P(200, "text/plain", String(packet_number).c_str());
   });
   server.on("/total_packets", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/plain", String(total_packets).c_str());
@@ -485,16 +386,15 @@ void loop() {
         }
         byte packet_info[4];
         LoRa.readBytes(packet_info, 4);
-        packet_number = (packet_info[0] + 256 * packet_info[1]); //read packet number
-        total_packets = (packet_info[2] + 256 * packet_info[3]); //read total packets info
+        packet_number = (packet_info[1] << 8) | packet_info[0]; //read packet number
+        total_packets = (packet_info[3] << 8) | packet_info[2]; //read total packets info
       }
       if (packet_number == 1)  //this packet indicates start of new photo
       {
         new_photo();
         get_time();
       }
-      string_num = (String(packet_number)); //this format is used for LCD output
-      Serial.print("Got packet " + string_num + "/" + String(total_packets));
+      Serial.print("Got packet " + String(packet_number) + "/" + String(total_packets));
       rssi = String(LoRa.packetRssi());
       snr = String(LoRa.packetSnr());
       Serial.println(" with RSSI: " + rssi + ", SNR: " + snr + " ,packet length= " + String(packet_size));
@@ -508,9 +408,9 @@ void loop() {
         }
         //Serial.println("");
       }
-      lcd_update(string_num, String(total_packets), LoRa.packetRssi(), LoRa.packetSnr());
-      current_packet_array[0] = packet_number % 256;
-      current_packet_array[1] = packet_number / 256;
+      lcd_update(String(packet_number), String(total_packets), LoRa.packetRssi(), LoRa.packetSnr());
+      current_packet_array[0] = packet_number;
+      current_packet_array[1] = packet_number >> 8;
       send_ack(current_packet_array);
       if (packet_number == total_packets) {  //if received a final packet
         current_packet_array[0] = 0;
@@ -520,12 +420,12 @@ void loop() {
         lcd.setCursor(0, 0);
         lcd.print("Finished");
       }
+      start_millis = millis();
     }
   current_millis = millis();
   if (current_millis - start_millis >= ack_retransmission_period)  //If no packet is received after a specified period, request retransmission
   {
-    ack_retransmission_period = random(150, 200);
-    Serial.println("Sending acknowledgment again for packet "+String(current_packet_array[0] + 256 * current_packet_array[1]));
+    Serial.println("Sending acknowledgment again for packet "+String((current_packet_array[1] << 8) | current_packet_array[0]));
     send_ack(current_packet_array);
     start_millis = current_millis;  //IMPORTANT to save the start time
   }
